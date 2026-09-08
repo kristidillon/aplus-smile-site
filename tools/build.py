@@ -7,8 +7,10 @@ www.aplusdentalfl.com from tools/content.py.
 
 Output is plain static HTML committed to the repo — GitHub Pages still
 serves the site with no build step. Regenerate after editing content.py.
-index.html is hand-maintained and is NOT overwritten by this script; its
-nav/footer are kept in sync by hand against nav_html()/footer_html() below.
+
+Every .html file in the repo is generated, index.html included. Do not
+hand-edit them — the next build overwrites your changes. Copy lives in
+content.py, layout in this file, styling in assets/site.css.
 """
 import html
 import os
@@ -616,15 +618,39 @@ def build_doctors_index():
     write("doctors/index.html", doc)
 
 
+def last_modified(relpath):
+    """The date this page's content actually last changed.
+
+    Stamping every URL with today's date on every build makes <lastmod> a lie,
+    and Google discounts sitemaps whose lastmod it cannot trust. So: if the
+    file differs from HEAD right now (or is new), it changed today; otherwise
+    use the date of the last commit that touched it. Falls back to today
+    outside a git checkout.
+    """
+    import subprocess
+    try:
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", relpath],
+                               cwd=ROOT, capture_output=True, text=True, timeout=10)
+        if dirty.returncode != 0:
+            return date.today().isoformat()
+        if dirty.stdout.strip():
+            return date.today().isoformat()
+        log = subprocess.run(["git", "log", "-1", "--format=%cs", "--", relpath],
+                             cwd=ROOT, capture_output=True, text=True, timeout=10)
+        stamp = log.stdout.strip()
+        return stamp if stamp else date.today().isoformat()
+    except (OSError, subprocess.SubprocessError):
+        return date.today().isoformat()
+
+
 def build_sitemap():
-    today = date.today().isoformat()
     urls = [("/", "1.0"), ("/services/", "0.9"), ("/doctors/", "0.8")]
     urls += [("/services/%s/" % s["slug"], "0.8") for s in SERVICES]
     urls += [("/doctors/%s/" % d["slug"], "0.7") for d in DOCTORS]
     body = "\n".join(
         "  <url>\n    <loc>%s%s</loc>\n    <lastmod>%s</lastmod>\n"
         "    <changefreq>monthly</changefreq>\n    <priority>%s</priority>\n  </url>"
-        % (SITE, u, today, pr) for u, pr in urls)
+        % (SITE, u, last_modified(u.lstrip("/") + "index.html"), pr) for u, pr in urls)
     write("sitemap.xml",
           '<?xml version="1.0" encoding="UTF-8"?>\n'
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
