@@ -1,2 +1,7 @@
+# www.aplusdentalfl.com
+# A+ Smile / BNY Dental P.C. — Fort Lauderdale, FL
+
 User-agent: *
-Disallow: /
+Allow: /
+
+Sitemap: https://www.aplusdentalfl.com/sitemap.xml
